@@ -22,6 +22,9 @@ except ImportError:
 
 
 class Cnab240(Cnab):
+    """
+
+    """
 
     def __init__(self):
         super(Cnab, self).__init__()
@@ -46,12 +49,6 @@ class Cnab240(Cnab):
         elif bank == '033':
             from .bancos.santander import Santander240
             return Santander240
-        elif bank == '104':
-            from .bancos.cef import Cef240
-            return Cef240
-        elif bank == '748':
-            from .bancos.sicredi import Sicredi240
-            return Sicredi240
         else:
             return Cnab240
 
@@ -63,9 +60,14 @@ class Cnab240(Cnab):
             return 1
 
     def _prepare_header(self):
+        """
+
+        :param:
+        :return:
+        """
         cnpj_cpf = re.sub('[^0-9]', '',
                           self.order.payment_mode_id.company_id.cnpj_cpf)
-        cedente_conta_dv = self.order.payment_mode_id.bank_account_id.\
+        cedente_conta_dv = self.order.payment_mode_id.bank_account_id. \
             acc_number_dig
         cedente_conta_dv = str(cedente_conta_dv)
         return {
@@ -81,14 +83,14 @@ class Cnab240(Cnab):
             'cedente_conta': int(self.order.payment_mode_id.bank_account_id.
                                  acc_number),
             'cedente_conta_dv': cedente_conta_dv,
-            'cedente_convenio': self.order.payment_mode_id.bank_account_id.
-            codigo_convenio,
             'cedente_agencia_dv': self.order.payment_mode_id.
-            bank_account_id.bra_number_dig,
-            'cedente_nome': self.order.user_id.company_id.legal_name,
+                bank_account_id.bra_number_dig,
+            'cedente_nome': self.order.payment_mode_id.company_id.legal_name,
             # DV ag e conta
             'cedente_dv_ag_cc': (self.order.payment_mode_id.
                                  bank_account_id.bra_number_dig),
+            'cedente_agencia_conta_dv': int(self.order.payment_mode_id.
+                                            bank_account_id.acc_number_dig),
             'arquivo_codigo': 1,  # Remessa/Retorno
             'servico_operacao': u'R',
             'nome_banco': unicode(self.order.payment_mode_id.bank_account_id.
@@ -125,6 +127,10 @@ class Cnab240(Cnab):
                       format or '')
 
     def _prepare_segmento(self, line):
+        """
+        :param line:
+        :return:
+        """
         prefixo, sulfixo = self.cep(line.partner_id.zip)
 
         # if not self.order.payment_mode_id.boleto_aceite == 'S':
@@ -153,13 +159,13 @@ class Cnab240(Cnab):
             'cedente_conta': int(self.order.payment_mode_id.bank_account_id.
                                  acc_number),
             'cedente_conta_dv': self.order.payment_mode_id.bank_account_id.
-            acc_number_dig,
-            'cedente_convenio': self.order.payment_mode_id.bank_account_id.
-            codigo_convenio,
+                acc_number_dig,
             'cedente_agencia_dv': self.order.payment_mode_id.bank_account_id.
-            bra_number_dig,
+                bra_number_dig,
+            'cedente_agencia_conta_dv': int(self.order.payment_mode_id.
+                                            bank_account_id.acc_number_dig),
             'cedente_nome':
-            self.order.payment_mode_id.bank_account_id.partner_id.legal_name,
+                self.order.payment_mode_id.bank_account_id.partner_id.legal_name,
             # DV ag e cc
             'cedente_dv_ag_cc': (self.order.payment_mode_id.bank_account_id.
                                  bra_number_dig),
@@ -182,16 +188,16 @@ class Cnab240(Cnab):
             'codigo_juros': 2,
             'juros_mora_data': self.format_date(
                 line.date_maturity),
-            'juros_mora_taxa':  Decimal(
+            'juros_mora_taxa': Decimal(
                 str(self.order.payment_mode_id.late_payment_interest)
-                ).quantize(Decimal('1.00')),
+            ).quantize(Decimal('1.00')),
             # Multa padrão em percentual no Odoo, valor '2'
             'codigo_multa': '2',
             'data_multa': self.format_date(
                 line.date_maturity),
-            'juros_multa':  Decimal(
+            'juros_multa': Decimal(
                 str(self.order.payment_mode_id.late_payment_fee)).quantize(
-                    Decimal('1.00')),
+                Decimal('1.00')),
             # TODO Remover taxa dia - deixar apenas taxa normal
             'juros_mora_taxa_dia': Decimal('0.00'),
             'valor_abatimento': Decimal('0.00'),
@@ -218,20 +224,35 @@ class Cnab240(Cnab):
         }
 
     def remessa(self, order):
+        """
+
+        :param order:
+        :return:
+        """
         cobrancasimples_valor_titulos = 0
 
         self.order = order
         header = self._prepare_header()
         self.arquivo = Arquivo(self.bank, **header)
+        #
         for line in order.line_ids:
-            seg = self._prepare_segmento(line.move_line_id)
-            self.arquivo.incluir_cobranca(header, **seg)
-            self.arquivo.lotes[0].header.servico_servico = 1
-            # TODO: tratar soma de tipos de cobranca
-            cobrancasimples_valor_titulos += line.move_line_id.amount_currency
-            self.arquivo.lotes[0].trailer.cobrancasimples_valor_titulos = \
-                Decimal(cobrancasimples_valor_titulos).quantize(
-                    Decimal('1.00'))
+
+            if line.validate_line_to_export():
+                seg = self._prepare_segmento(line.move_line_id)
+                self.arquivo.incluir_cobranca(header, **seg)
+                self.arquivo.lotes[0].header.servico_servico = 1
+                # TODO: tratar soma de tipos de cobranca
+                cobrancasimples_valor_titulos += line.value
+                self.arquivo.lotes[0].trailer.cobrancasimples_valor_titulos = \
+                    Decimal(cobrancasimples_valor_titulos).quantize(
+                        Decimal('1.00'))
+                year = str(datetime.datetime.now().year)[2:]
+                # add year in nosso_numero because we pass it to bank
+                # and this is used to loacate payment order line while
+                # importing bank return
+                if line.nosso_numero[:2] != year:
+                    line.nosso_numero  =  year + str(line.nosso_numero)
+                line.state = 'ag'
 
         return unicode(self.arquivo)
 

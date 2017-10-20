@@ -176,7 +176,6 @@ class TestSaleOrder(TransactionCase):
             (0, 0,
                 {
                     'product_id': self.default_product.id,
-                    'product_uom': self.default_product.uom_id.id,
                     'product_uom_qty': 10.0,
                     'name': 'product test 5',
                     'price_unit': 100.00,
@@ -192,7 +191,6 @@ class TestSaleOrder(TransactionCase):
             (0, 0,
                 {
                     'product_id': self.service.id,
-                    'product_uom': self.service.uom_id.id,
                     'product_uom_qty': 10.0,
                     'name': 'product test 5',
                     'price_unit': 100.00,

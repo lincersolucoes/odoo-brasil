@@ -7,6 +7,7 @@
 
 
 from ..cnab_240 import Cnab240
+from datetime import datetime
 
 
 class Itau240(Cnab240):
@@ -38,6 +39,12 @@ class Itau240(Cnab240):
         vals['cedente_conta_dv'] = int(vals['cedente_conta_dv'])
         vals['cedente_agencia_dv'] = int(vals['cedente_agencia_dv'])
         vals['cedente_dv_ag_cc'] = int(vals['cedente_dv_ag_cc'])
+        vals['cedente_nome'] = line.company_id.legal_name[:30]
+        vals['sacado_nome'] = line.partner_id.name[:30]
+        vals['sacado_cidade'] = line.partner_id.city_id.name[:15]
+        vals['sacado_bairro'] = line.partner_id.district[:15]
+        vals['sacado_endereco'] = vals['sacado_endereco'][:40]
+        vals['numero_documento'] = str(datetime.now().year)[2:] + str(line.nosso_numero)  # 10 chars limit
         return vals
 
     def dv_nosso_numero(self, agencia, conta, carteira, nosso_numero):
