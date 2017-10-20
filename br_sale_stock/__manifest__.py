@@ -4,7 +4,7 @@
 # © 2016 Danimar Ribeiro, Trustcode
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-{  # pylint: disable=C8101,C8103
+{
     'name': 'Brazilian Localization Sales and Warehouse',
     'description': 'Brazilian Localization for sale_stock_module',
     'category': 'Localisation',
@@ -18,5 +18,5 @@
     'data': [
         'views/sale_stock_view.xml',
     ],
-    'auto_install': True,
+    'auto_install': False,
 }

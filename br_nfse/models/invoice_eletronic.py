@@ -36,9 +36,8 @@ class InvoiceEletronic(models.Model):
     _inherit = 'invoice.eletronic'
 
     ambiente_nfse = fields.Selection(
-        [('homologacao', u'Homologação'),
-         ('producao', u'Produção')],
-        string=u'Ambiente', readonly=True, states=STATE)
+        string="Ambiente NFe", related="company_id.tipo_ambiente_nfse",
+        readonly=True)
     operation = fields.Selection(
         [('T', u"Tributado em São Paulo"),
          ('F', u"Tributado Fora de São Paulo"),
@@ -91,10 +90,10 @@ class InvoiceEletronic(models.Model):
                     if not eletr.codigo_servico_paulistana:
                         errors.append(u'%s - Código da NFSe paulistana não \
                                       configurado' % prod)
-                if not eletr.pis_cst:
-                    errors.append(u'%s - CST do PIS' % prod)
-                if not eletr.cofins_cst:
-                    errors.append(u'%s - CST do Cofins' % prod)
+                # if not eletr.pis_cst:
+                #     errors.append(u'%s - CST do PIS' % prod)
+                # if not eletr.cofins_cst:
+                #     errors.append(u'%s - CST do Cofins' % prod)
 
         return errors
 
@@ -113,7 +112,7 @@ class InvoiceEletronic(models.Model):
                 'tipo_cpfcnpj': 2 if partner.is_company else 1,
                 'cpf_cnpj': re.sub('[^0-9]', '',
                                    partner.cnpj_cpf or ''),
-                'razao_social': partner.legal_name or '',
+                'razao_social': partner.legal_name or partner.name or '',
                 'logradouro': partner.street or '',
                 'numero': partner.number or '',
                 'complemento': partner.street2 or '',
@@ -220,32 +219,10 @@ class InvoiceEletronic(models.Model):
             res.update(nfse_vals)
         return res
 
-    def _find_attachment_ids_email(self):
-        atts = super(InvoiceEletronic, self)._find_attachment_ids_email()
-        if self.model not in ('001'):
-            return atts
-
-        attachment_obj = self.env['ir.attachment']
-        danfe_report = self.env['ir.actions.report.xml'].search(
-            [('report_name', '=', 'br_nfse.main_template_br_nfse_danfe')])
-        report_service = danfe_report.report_name
-        danfse = self.env['report'].get_pdf([self.id], report_service)
-        if danfse:
-            danfe_id = attachment_obj.create(dict(
-                name="paulistana-%08d.pdf" % self.numero,
-                datas_fname="paulistana-%08d.pdf" % self.numero,
-                datas=base64.b64encode(danfse),
-                mimetype='application/pdf',
-                res_model='account.invoice',
-                res_id=self.invoice_id.id,
-            ))
-            atts.append(danfe_id.id)
-        return atts
-
     @api.multi
     def action_send_eletronic_invoice(self):
         super(InvoiceEletronic, self).action_send_eletronic_invoice()
-        if self.model == '001' and self.state not in ('done', 'cancel'):
+        if self.model == '001':
             self.state = 'error'
 
             nfse_values = self._prepare_eletronic_invoice_values()
@@ -256,7 +233,7 @@ class InvoiceEletronic(models.Model):
             certificado = Certificado(
                 cert_pfx, self.company_id.nfe_a1_password)
 
-            if self.ambiente == 'producao':
+            if self.ambiente_nfse == '1':
                 resposta = envio_lote_rps(certificado, nfse=nfse_values)
             else:
                 resposta = teste_envio_lote_rps(certificado, nfse=nfse_values)
@@ -267,7 +244,7 @@ class InvoiceEletronic(models.Model):
                 self.mensagem_retorno = \
                     'Nota Fiscal Paulistana emitida com sucesso'
 
-                if self.ambiente == 'producao':  # Apenas producão tem essa tag
+                if self.ambiente_nfse == '1':  # Apenas producão tem essa tag
                     self.verify_code = \
                         retorno.ChaveNFeRPS.ChaveNFe.CodigoVerificacao
                     self.numero_nfse = retorno.ChaveNFeRPS.ChaveNFe.NumeroNFe

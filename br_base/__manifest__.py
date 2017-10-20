@@ -2,7 +2,7 @@
 # © 2009  Renato Lima - Akretion
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-{  # pylint: disable=C8101,C8103
+{
     'name': 'Odoo Brasil - Módulo Base',
     'description': 'Brazilian Localization Base',
     'version': '10.0.1.0.0',
@@ -23,7 +23,7 @@
         ],
     },
     'data': [
-        'views/br_base.xml',
+        #'views/br_base.xml',
         'views/ir_module.xml',
         'views/br_base_view.xml',
         'views/res_country_view.xml',
