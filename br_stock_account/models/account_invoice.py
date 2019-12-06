@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # © 2016 Danimar Ribeiro, Trustcode
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
@@ -13,14 +12,6 @@ class AccountInvoice(models.Model):
         related='fiscal_position_id.fiscal_type', readonly=True)
     picking_origin_id = fields.Many2one(
         'stock.picking', string="Picking Origin")
-
-    @api.multi
-    def copy(self, default=None):
-        new_acc_inv = super(AccountInvoice, self).copy(default)
-        for i in range(len(new_acc_inv.invoice_line_ids)):
-            new_acc_inv.invoice_line_ids[i].import_declaration_ids = \
-                self.invoice_line_ids[i].import_declaration_ids
-        return new_acc_inv
 
     @api.one
     @api.depends('invoice_line_ids.price_subtotal',
@@ -52,6 +43,8 @@ class AccountInvoice(models.Model):
         compute="_compute_amount")
 
     # Transporte
+    goods_delivery_date = fields.Datetime(
+        string="Data Entrega", help="Data para saída/entrada das mercadorias")
     freight_responsibility = fields.Selection(
         [('0', '0 - Contratação do Frete por conta do Remetente (CIF)'),
          ('1', '1 - Contratação do Frete por conta do Destinatário (FOB)'),

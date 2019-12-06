@@ -1,12 +1,14 @@
-# -*- coding: utf-8 -*-
 # © 2016 Danimar Ribeiro <danimaribeiro@gmail.com>, Trustcode
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
+import logging
 from datetime import datetime
 from random import SystemRandom
 
-from odoo import api, fields, models
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 TYPE2EDOC = {
@@ -31,7 +33,7 @@ class AccountInvoice(models.Model):
         u'Documentos Eletrônicos', readonly=True)
     invoice_model = fields.Char(
         string="Modelo de Fatura", related="product_document_id.code",
-        readonly=True)
+        readonly=True, store=True)
     total_edocs = fields.Integer(string="Total NFe",
                                  compute=_compute_total_edocs)
     internal_number = fields.Integer(
@@ -62,21 +64,20 @@ class AccountInvoice(models.Model):
             return vals
 
     def _return_pdf_invoice(self, doc):
-        return None
+        return False
 
     def action_preview_danfe(self):
-
         docs = self.env['invoice.eletronic'].search(
             [('invoice_id', '=', self.id)])
 
         if not docs:
-            raise UserError(u'Não existe um E-Doc relacionado à esta fatura')
+            raise UserError(_('Não existe um E-Doc relacionado à esta fatura'))
 
         if len(docs) > 1:
             return {
                 'type': 'ir.actions.act_window',
                 'res_model': 'invoice.eletronic.selection.wizard',
-                'name': "Escolha a nota a ser impressa",
+                'name': _("Escolha a nota a ser impressa"),
                 'view_mode': 'form',
                 'context': self.env.context,
                 'target': 'new',
@@ -85,11 +86,11 @@ class AccountInvoice(models.Model):
             return self._action_preview_danfe(docs[0])
 
     def _action_preview_danfe(self, doc):
-
         report = self._return_pdf_invoice(doc)
         if not report:
             raise UserError(
-                'Nenhum relatório implementado para este modelo de documento')
+                _('Nenhum relatório implementado para este modelo \
+                  de documento'))
         if not isinstance(report, str):
             return report
         action = self.env.ref(report).report_action(doc)
@@ -111,6 +112,7 @@ class AccountInvoice(models.Model):
             'origem': line.icms_origem,
             'tributos_estimados': line.tributos_estimados,
             'ncm': line.fiscal_classification_id.code,
+            'pedido_compra': line.pedido_compra,
             'item_pedido_compra': line.item_pedido_compra,
             # - ICMS -
             'icms_cst': line.icms_cst,
@@ -185,12 +187,12 @@ class AccountInvoice(models.Model):
             'invoice_id': invoice.id,
             'code': invoice.number,
             'company_id': invoice.company_id.id,
+            'schedule_user_id': self.env.user.id,
             'state': 'draft',
             'tipo_operacao': TYPE2EDOC[invoice.type],
             'numero_controle': num_controle,
             'data_emissao': datetime.now(),
             'data_agendada': invoice.date_invoice,
-            'data_fatura': datetime.now(),
             'finalidade_emissao': '1',
             'partner_id': invoice.partner_id.id,
             'payment_term_id': invoice.payment_term_id.id,
@@ -275,9 +277,13 @@ class AccountInvoice(models.Model):
                 [('invoice_id', '=', item.id)])
             for edoc in edocs:
                 if edoc.state == 'done':
-                    raise UserError(u'Documento eletrônico emitido - Cancele o \
-                                    documento para poder cancelar a fatura')
+                    raise UserError(
+                        _('Documento eletrônico emitido - Cancele o \
+                          documento para poder cancelar a fatura'))
                 if edoc.can_unlink():
+                    _logger.info(
+                        'deleting edoc %s by user %s in action_cancel (%s)' %
+                        (edoc.id, self.env.user.id, item.move_name))
                     edoc.sudo().unlink()
         return res
 
@@ -297,5 +303,9 @@ class AccountInvoiceLine(models.Model):
                 Transmitido: Já foi transmitido eletronicamente."""
     )
 
+    pedido_compra = fields.Char(
+        string="Pedido Compra", size=60,
+        help="Se setado aqui sobrescreve o pedido de compra da fatura")
     item_pedido_compra = fields.Char(
-        string=u'Item do pedido de compra do cliente')
+        string="Item de compra", size=20,
+        help=u'Item do pedido de compra do cliente')
